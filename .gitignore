@@ -5,4 +5,5 @@
 .copilot/
 .windsurf/
 .aidev/
+.kilo/
 *.prompt
