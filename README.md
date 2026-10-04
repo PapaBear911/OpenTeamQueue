@@ -1,16 +1,54 @@
-# RallyQueue
+# OpenTeamQueue 🏸
 
-Session-based queuing for Badminton, Pickleball & Tennis — single static file, no build step.
+> Zero-build sports queuing, scoreboard, and tournament management app for badminton, pickleball, and tennis.
 
-- Partner roulette + match rotation (doubles / singles, BYE handling)
-- Scoreboard with scorekeeper pad, finish/reopen lifecycle
-- Court management, fee management, session + global leaderboards
-- Sessions persist in browser `localStorage`, with JSON export/import backup
+Live single-page web app built with vanilla HTML, CSS, and modern JavaScript. Runs directly in any modern browser with no build step, bundler, or server required.
 
-## Run locally
+## Features
 
-Just open `index.html` in a browser (use `http://localhost`, not a LAN IP, for microphone/speech-to-text).
+- **Queue & Court Management**: Dynamic queue randomizer, court assignment, and waitlist tracking.
+- **Live Scoreboard**: Real-time score counter, match timer, and game history.
+- **Tournament Formats**: Round robin, brackets, and custom group stages.
+- **Session & Fee Tracker**: Automatic fee splitting, attendance, and player stats.
+- **Offline & Local First**: State persists in `localStorage`.
+- **Zero Build**: Single-file architecture (`index.html`).
 
-## Host on GitHub Pages
+## Getting Started
 
-Settings → Pages → Deploy from branch → `main` / root. App goes live at `https://<user>.github.io/BadmintonTeamQueuing/`.
+### Local
+
+Simply open `index.html` in your web browser:
+
+```bash
+# Direct open
+open index.html        # macOS
+start index.html       # Windows
+
+# Or via a lightweight local server
+python -m http.server 8000
+# or
+npx serve .
+```
+
+> **Note**: Access via `http://localhost` if using Web Speech / microphone features.
+
+### GitHub Pages Deployment
+
+1. Push this repository to GitHub.
+2. Navigate to **Settings** > **Pages**.
+3. Under **Build and deployment**:
+   - **Source**: `Deploy from a branch`
+   - **Branch**: `main`
+   - **Folder**: `/ (root)`
+4. Click **Save**.
+
+## Tech Stack
+
+- Vanilla HTML5 / ES6 JavaScript
+- Modern CSS (CSS Layers, Custom Properties)
+- [Anime.js](https://animejs.com/) (CDN)
+- Google Fonts
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
