@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RallyQueue — Badminton · Pickleball · Tennis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<style>
+  :root{
+    --bg:#070b16; --panel:rgba(20,27,51,.72); --panel2:#1b2444;
+    --line:rgba(122,148,255,.18); --ink:#eef2ff; --muted:#8b96c4;
+    --acc:#7cf0c8; --acc2:#7ab8ff; --warn:#ffd166; --bad:#ff6b81; --radius:18px;
+    --ease:cubic-bezier(.34,1.4,.64,1);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif; color:var(--ink);
+    background:
+      radial-gradient(1100px 550px at 85% -10%, rgba(122,184,255,.16), transparent 60%),
+      radial-gradient(900px 500px at -10% 15%, rgba(124,240,200,.10), transparent 55%),
+      var(--bg);
+    min-height:100vh; padding:clamp(16px,3vw,40px);
+  }
+  h1{font-size:clamp(30px,4.5vw,52px); letter-spacing:-.03em; font-weight:800}
+  h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .sub{color:var(--muted); margin:8px 0 26px; font-size:clamp(13px,1.4vw,15px)}
+
+  /* ---------- LANDING OVERLAY ---------- */
+  .landing{
+    position:fixed; inset:0; z-index:100; background:rgba(7,11,22,.82);
+    backdrop-filter:blur(14px) saturate(160%); -webkit-backdrop-filter:blur(14px) saturate(160%);
+    display:flex; align-items:center; justify-content:center; padding:20px; overflow-y:auto;
+  }
+  .landing.hidden{display:none}
+  .landing-inner{width:100%; max-width:640px}
+  .landing-inner h1{text-align:center}
+  .landing-inner .sub{text-align:center; margin-bottom:22px}
+  .session-list{display:grid; gap:10px; margin-bottom:18px}
+  .session-card{
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    background:linear-gradient(180deg,var(--panel),rgba(27,36,68,.6)); border:1px solid var(--line);
+    border-radius:14px; padding:14px 16px;
+  }
+  .session-card b{font-size:15px}
+  .session-card .meta{color:var(--muted); font-size:12px; display:block; margin-top:3px}
+  .session-card .actions{display:flex; gap:8px}
+  .session-card button{margin:0; min-height:38px; padding:8px 14px}
+  #newSessionForm{display:flex; gap:10px}
+  #newSessionForm input{flex:1}
+  #newSessionForm button{margin:0; white-space:nowrap}
+  #clearCache{width:100%; margin-top:12px}
+
+  /* ---------- APP ---------- */
+  .grid{display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); align-items:start}
+  .card{
+    background:linear-gradient(180deg,var(--panel),rgba(27,36,68,.6));
+    backdrop-filter:blur(12px) saturate(160%); -webkit-backdrop-filter:blur(12px) saturate(160%);
+    border:1px solid var(--line); border-radius:var(--radius); padding:20px;
+    box-shadow:0 18px 44px rgba(0,0,0,.4); transition:transform .25s var(--ease), border-color .25s;
+  }
+  .card:hover{transform:translateY(-3px); border-color:rgba(124,240,200,.35)}
+  .card h2{font-size:13px; text-transform:uppercase; letter-spacing:.16em; color:var(--acc); margin-bottom:16px}
+  label{font-size:11px; color:var(--muted); display:block; margin:14px 0 6px; text-transform:uppercase; letter-spacing:.12em}
+  input,select{width:100%; padding:11px 13px; border-radius:12px; border:1px solid var(--line);
+    background:rgba(10,15,35,.8); color:var(--ink); font-size:14px; transition:border-color .2s}
+  input:focus,select:focus{outline:none; border-color:var(--acc)}
+  :focus-visible{outline:3px solid var(--acc); outline-offset:2px; border-radius:6px}
+  button{cursor:pointer; border:none; border-radius:12px; padding:11px 16px; font-weight:700; font-size:14px; color:#062018;
+    background:linear-gradient(90deg,var(--acc),#5eead4); margin-top:14px; min-height:44px;
+    transition:transform .18s var(--ease), box-shadow .18s}
+  button:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(124,240,200,.3)}
+  button:active{transform:scale(.96)}
+  button.ghost{background:transparent; color:var(--ink); border:1px solid var(--line)}
+  button.tiny{padding:4px 10px; min-height:28px; margin:0; font-size:12px; border-radius:8px; background:transparent; color:var(--muted); border:1px solid var(--line)}
+  button.tiny:hover{color:var(--bad); border-color:var(--bad)}
+  .row{display:flex; gap:10px} .row > *{flex:1}
+  .pill{display:inline-block; padding:5px 12px; border-radius:999px; background:rgba(10,15,35,.8); border:1px solid var(--line);
+    font-size:12px; color:var(--muted); margin:4px 4px 0 0}
+  .pill b{color:var(--ink)} .pill.bye{border-color:var(--warn); color:var(--warn)}
+  ul{list-style:none}
+  li{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 4px; border-bottom:1px dashed var(--line); font-size:14px}
+  .tag{font-size:11px; padding:3px 9px; border-radius:999px; background:rgba(124,240,200,.12); color:var(--acc)}
+  .tag.rr{background:rgba(122,184,255,.14); color:var(--acc2)}
+  .tag.done{background:rgba(124,240,200,.16); color:var(--acc); border:1px solid rgba(124,240,200,.45)}
+  .match{opacity:1}
+  .match{border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; background:rgba(10,15,35,.6)}
+  .match .teams{display:flex; justify-content:space-between; align-items:center; gap:10px; font-weight:700; font-size:14px; flex-wrap:wrap}
+  .match-score{display:flex; gap:10px; margin-top:10px; align-items:center; flex-wrap:wrap}
+  .match-score input{width:76px; text-align:center; padding:9px}
+  .match-score span{color:var(--muted); font-size:12px}
+  .pad-btn{flex:0 0 44px; min-height:44px; padding:0; font-size:20px; margin:0; border-radius:12px}
+  .stage-head{width:100%; font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin:14px 0 6px}
+  .fee-tiles{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0}
+  .fee-tile{background:rgba(10,15,35,.6); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:left}
+  .fee-tile b{display:block; font-size:20px}
+  .fee-tile span{font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted)}
+  .fee-tile.green b{color:var(--acc)} .fee-tile.amber b{color:var(--warn)}
+  .chip-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+  .chip{padding:8px 12px; border-radius:999px; background:rgba(10,15,35,.8); border:1px solid var(--line); font-size:13px; cursor:grab; user-select:none; touch-action:none}
+  .chip.dragging{opacity:.5; border-color:var(--acc)}
+  .chip small{color:var(--muted); margin-left:6px}
+  table{width:100%; border-collapse:collapse; font-size:13px; margin-top:12px}
+  th,td{padding:9px 6px; text-align:center; border-bottom:1px solid var(--line)}
+  th{color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:.12em}
+  .stats{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px}
+  .stat{flex:1; min-width:80px; background:rgba(10,15,35,.6); border:1px solid var(--line); border-radius:12px; padding:10px; text-align:center}
+  .stat b{display:block; font-size:22px; color:var(--acc)}
+  .stat span{font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted)}
+  .toast{position:fixed; bottom:22px; right:22px; background:var(--panel2); border:1px solid var(--acc);
+    padding:12px 18px; border-radius:14px; opacity:0; pointer-events:none; z-index:200; font-size:14px}
+  .empty{color:var(--muted); font-size:13px; padding:10px 0}
+  .hint{color:var(--muted); font-size:11px; margin-top:10px}
+  .app-header{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap}
+  .app-header button{margin:0}
+
+  /* ---------- SIDE NAV ---------- */
+  .sidenav{
+    position:fixed; left:0; top:0; bottom:0; width:212px; z-index:40;
+    background:rgba(10,15,35,.72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border-right:1px solid var(--line); padding:26px 16px; display:flex; flex-direction:column; gap:4px;
+  }
+  .sidenav .brand{font-weight:800; font-size:20px; margin-bottom:22px}
+  .sidenav .brand span{background:linear-gradient(90deg,var(--acc),var(--acc2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .sidenav a{
+    display:block; padding:10px 12px; border-radius:10px; color:var(--muted); text-decoration:none;
+    font-size:13px; letter-spacing:.04em; transition:background .2s, color .2s;
+  }
+  .sidenav a:hover{color:var(--ink); background:rgba(122,148,255,.08)}
+  .sidenav a.active{color:var(--acc); background:rgba(124,240,200,.10); font-weight:700}
+  .sidenav .back{margin-top:auto; width:100%; text-align:left}
+  .main{margin-left:212px}
+  .skip{position:absolute; left:-9999px} .skip:focus{left:10px; top:10px; z-index:300; background:var(--panel2); padding:10px 14px; border-radius:10px}
+
+  @media (max-width: 1024px){
+    .sidenav{width:180px}
+    .main{margin-left:180px}
+  }
+  @media (max-width: 820px){
+    .sidenav{
+      position:fixed; left:0; right:0; bottom:0; top:auto; z-index:60;
+      flex-direction:row; justify-content:space-around; align-items:center; gap:2px;
+      padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+      border-right:none; border-top:1px solid var(--line);
+      background:rgba(10,15,35,.92);
+    }
+    .sidenav .brand{display:none}
+    .sidenav a{padding:8px 10px; font-size:12px; text-align:center; flex:1}
+    .sidenav .back{margin:0; width:auto; padding:8px 10px; font-size:11px; min-height:0; flex:0 0 auto}
+    .main{margin-left:0; padding-bottom:76px}
+  }
+
+  /* ---------- TABLET ---------- */
+  @media (max-width: 1024px){
+    body{padding:18px}
+    .grid{grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px}
+    .card{padding:16px; border-radius:16px}
+    .match-score input{width:64px; padding:8px}
+    .stat b{font-size:19px}
+  }
+  @media (max-width: 768px){
+    .grid{grid-template-columns:1fr 1fr}
+    .card:nth-child(4){grid-column:1 / -1}
+    .sub{margin-bottom:18px}
+    #newSessionForm{flex-direction:column}
+    #newSessionForm button{width:100%}
+  }
+  @media (max-width: 620px){
+    .grid{grid-template-columns:1fr}
+    .card:nth-child(4){grid-column:auto}
+    .match-score input{width:56px}
+    .session-card{flex-direction:column; align-items:stretch}
+    .session-card .actions{justify-content:flex-end}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.01ms!important; transition-duration:.01ms!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- LANDING / SESSION OVERLAY -->
+<div id="landing" class="landing">
+  <div class="landing-inner">
+    <div style="text-align:center; margin-bottom:6px">
+      <svg width="46" height="46" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <path d="M32 6c-1.8 0-3 1.6-3 3.4V26h6V9.4C35 7.6 33.8 6 32 6Z" fill="#7cf0c8"/>
+        <path d="M18 8.6c-1.7.6-2.4 2.6-1.9 4.3l9.5 23.4 5-2.1L18 8.6Z" fill="#7ab8ff"/>
+        <path d="M46 8.6l-13.1 25.6 5 2.1 9.5-23.4c.5-1.7-.2-3.7-1.9-4.3" fill="#7ab8ff"/>
+        <path d="M12 14.6c-1.8-.2-3.5.9-3.8 2.7l6.3 25.8 5.3-1.1L12 14.6Z" fill="#5eead4"/>
+        <path d="M52 14.6l-7.8 27.4 5.3 1.1 6.3-25.8c-.3-1.8-2-2.9-3.8-2.7Z" fill="#5eead4"/>
+        <path d="M20 42h24c0 5.5-4.6 10-10 10h-4c-5.4 0-10-4.5-10-10Z" fill="#eef2ff"/>
+        <rect x="18" y="50" width="28" height="5" rx="2.5" fill="#7cf0c8"/>
+      </svg>
+      <h1 style="margin-top:6px">Rally<span>Queue</span></h1>
+    </div>
+    <p class="sub">Session-based queuing for Badminton, Pickleball &amp; Tennis — saved to this browser.</p>
+    <div id="sessionList" class="session-list"></div>
+    <form id="newSessionForm">
+      <input id="sessionName" placeholder="New session name — e.g. Friday Night Badminton" aria-label="Session name" />
+      <button type="submit">+ Add New Session</button>
+    </form>
+    <div class="row" style="margin-top:10px">
+      <button class="ghost" id="exportJson" style="margin-top:0">⬇ Export JSON</button>
+      <label class="ghost" style="flex:1; text-align:center; padding:11px; border-radius:12px; cursor:pointer; border:1px solid var(--line); font-size:14px; font-weight:700">
+        ⬆ Import JSON<input type="file" id="importJson" accept="application/json" style="display:none">
+      </label>
+    </div>
+    <button class="ghost" id="clearCache">🗑 Clear saved cache (all sessions)</button>
+  </div>
+</div>
+
+<a class="skip" href="#s-setup">Skip to content</a>
+
+<!-- SIDE NAV -->
+<nav class="sidenav" aria-label="Sections">
+  <div class="brand">Rally<span>Queue</span></div>
+  <a href="#s-court">🏟 Courts</a>
+  <a href="#s-setup" class="active">👥 Setup</a>
+  <a href="#s-queue">🎰 Queue</a>
+  <a href="#s-board">📋 Score</a>
+  <a href="#s-bracket">🏆 Ladder</a>
+  <a href="#s-fees">💰 Fees</a>
+  <a href="#s-ranks">📊 Ranks</a>
+  <button class="ghost back" onclick="showLanding()">← Sessions</button>
+</nav>
+
+<!-- APP -->
+<div class="main">
+<p class="sub" id="sessionTitle" style="font-weight:700; color:var(--ink)"></p>
+<p class="sub" style="margin-top:-18px">Premium queuing · random partners · matchmaking · scoreboards · round-robin championship ladder.</p>
+
+<div class="grid">
+  <section class="card" aria-label="Court Management" id="s-court">
+    <h2>0 · Court Management</h2>
+    <div class="row">
+      <input id="courtName" placeholder="Court name — e.g. Court 1" />
+      <button class="ghost" onclick="addCourt()" style="margin:0">+ Add Court</button>
+    </div>
+    <p class="hint">Courts are occupied when a queued match is started on them.</p>
+    <div id="courtList"></div>
+  </section>
+
+  <section class="card" aria-label="Setup" id="s-setup">
+    <h2>1 · Setup</h2>
+    <div class="stats">
+      <div class="stat"><b id="statPlayers">0</b><span>Players</span></div>
+      <div class="stat"><b id="statMatches">0</b><span>Matches</span></div>
+      <div class="stat"><b id="statDone">0</b><span>Scored</span></div>
+    </div>
+    <label for="sport">Sport</label>
+    <select id="sport">
+      <option>Badminton</option><option>Pickleball</option><option>Tennis</option>
+    </select>
+    <p class="hint" id="sportHint">First to 21 · win by 2</p>
+    <label for="format">Format</label>
+    <select id="format">
+      <option value="doubles">Doubles (team vs team)</option>
+      <option value="singles">Singles (player vs player)</option>
+    </select>
+    <label for="players">Players (comma separated)</label>
+    <div class="row" style="align-items:stretch">
+      <input id="players" placeholder="Ana, Ben, Cara..." style="flex:1" />
+      <button type="button" id="micBtn" class="ghost" style="flex:0 0 auto; margin:0" title="Speech to add players">🎤 Speak</button>
+    </div>
+    <p class="hint" id="micHint">Say names separated by commas — e.g. "Ana, Ben, Cara" — or say "Ana and Ben and Cara".</p>
+    <div class="row">
+      <button onclick="addPlayers()">Add Players</button>
+      <button class="ghost" onclick="resetAll()">Reset</button>
+    </div>
+    <div id="playerList"></div>
+  </section>
+
+  <section class="card" aria-label="Queue" id="s-queue">
+    <h2>2 · Partner Roulette &amp; Queue</h2>
+    <p class="empty" id="rouletteHint">Add players, then spin.</p>
+    <div id="rouletteResult" aria-live="polite"></div>
+    <div class="row">
+      <button onclick="spinRoulette()">🎰 Spin Roulette</button>
+      <button class="ghost" onclick="genMatch()">Queue Match</button>
+    </div>
+    <p class="hint">Rotation prefers the rested players — no duplicate pairing until everyone has rotated.</p>
+    <div id="upNext"></div>
+  </section>
+
+  <section class="card" aria-label="Scoreboard" id="s-board">
+    <h2>3 · Scoreboard &amp; Tally</h2>
+    <p class="hint" id="saveState" style="margin:-8px 0 10px">All changes auto-save locally</p>
+    <div id="scoreboard"><p class="empty">No matches yet.</p></div>
+    <button class="ghost" onclick="renderStandings()">Refresh Standings</button>
+    <p class="hint">Scores save as you type — press ✓ finish on a match to tally it. Standings count finished matches only.</p>
+    <div id="standings"></div>
+  </section>
+
+  <section class="card" aria-label="Championship" id="s-bracket">
+    <h2>4 · Elimination → Round Robin</h2>
+    <label for="advanceN">Advance top N to round robin</label>
+    <select id="advanceN"><option>4</option><option selected>6</option><option>8</option><option>10</option></select>
+    <button onclick="eliminate()">Build Championship Ladder</button>
+    <div id="bracket"></div>
+  </section>
+
+  <section class="card" aria-label="Fee Management" id="s-fees">
+    <h2>5 · Fee Management</h2>
+    <p class="hint" style="margin-top:0">Per-player rates for this session. Collected auto-computes from roster.</p>
+    <div class="row">
+      <div><label for="feeSingles">Singles shuttle /player ₱</label><input id="feeSingles" type="number" min="0" value="60" oninput="updateFees()"></div>
+      <div><label for="feeDoubles">Doubles shuttle /player ₱</label><input id="feeDoubles" type="number" min="0" value="30" oninput="updateFees()"></div>
+    </div>
+    <label for="feeCourt">Court fee /player ₱</label>
+    <input id="feeCourt" type="number" min="0" value="120" oninput="updateFees()">
+    <div class="fee-tiles">
+      <div class="fee-tile green"><span>Collected</span><b id="feeCollected">₱0</b></div>
+      <div class="fee-tile amber"><span>Outstanding</span><b id="feeOutstanding">₱0</b></div>
+      <div class="fee-tile"><span>Expenses</span><b id="feeExpensesTotal">₱0</b></div>
+      <div class="fee-tile green"><span>Net profit</span><b id="feeNet">₱0</b></div>
+    </div>
+    <div class="row">
+      <input id="expenseName" placeholder="Expense — e.g. Court rental">
+      <input id="expenseAmt" type="number" min="0" placeholder="₱">
+    </div>
+    <div class="row">
+      <button class="ghost" onclick="addExpense()" style="margin-top:10px">+ Add expense</button>
+      <button class="ghost" onclick="exportFeesCsv()" style="margin-top:10px">⬇ Export CSV</button>
+    </div>
+    <div id="expenseList"></div>
+    <div id="feeRoster"></div>
+  </section>
+
+  <section class="card" aria-label="Leaderboard" id="s-ranks">
+    <h2>6 · Session Leaderboard</h2>
+    <div class="row">
+      <button class="ghost" id="tabSessionBtn" onclick="showRankTab('session')" style="margin-top:0">Session</button>
+      <button class="ghost" id="tabGlobalBtn" onclick="showRankTab('global')" style="margin-top:0">Global Rankings →</button>
+    </div>
+    <div id="leaderboard"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+let players = [];
+let gameList = [];
+let courts = [];      // {id,name,status,matchId}
+let fees = {singles:60, doubles:30, court:120};
+let expenses = [];    // {name, amt}
+let paidMap = {};     // name -> true if paid
+let rankTab = 'session';
+let currentSessionId = null;
+let usedMatchKeys = new Set();
+const $ = id => document.getElementById(id);
+const pairKey = (a,b) => [...a].sort().join('+') + '|' + [...b].sort().join('+');
+
+// ---------- session cache ----------
+function getDB(){ try{ return JSON.parse(localStorage.getItem('rallyqueue_db')) || {sessions:{}, current:null}; }catch(e){ return {sessions:{}, current:null}; } }
+function putDB(db){ localStorage.setItem('rallyqueue_db', JSON.stringify(db)); }
+
+function save(){
+  if(!currentSessionId) return;
+  const db = getDB();
+  const s = db.sessions[currentSessionId];
+  if(!s) return;
+  s.players = players; s.matches = gameList; s.courts = courts; s.fees = fees; s.expenses = expenses; s.paidMap = paidMap; s.sport = $('sport').value; s.format = $('format').value; s.updated = Date.now();
+  db.current = currentSessionId;
+  putDB(db);
+  const el = document.getElementById('saveState');
+  if(el){ el.textContent = '✓ Saved ' + new Date().toLocaleTimeString();
+    clearTimeout(el._t); el._t = setTimeout(()=>el.textContent='All changes auto-save locally', 2500); }
+}
+function loadSession(id){
+  const db = getDB(); const s = db.sessions[id]; if(!s) return;
+  currentSessionId = id;
+  players = s.players || []; gameList = s.matches || [];
+  courts = s.courts || [];
+  fees = s.fees || {singles:60, doubles:30, court:120};
+  expenses = s.expenses || []; paidMap = s.paidMap || {};
+  $('sport').value = s.sport || 'Badminton'; $('format').value = s.format || 'doubles';
+  usedMatchKeys = new Set(gameList.map(m=>pairKey(m.a,m.b)));
+  $('sessionTitle').textContent = 'Session: ' + s.name;
+  $('sportHint').textContent = SPORT_HINTS[$('sport').value];
+  if($('feeSingles')){ $('feeSingles').value = fees.singles; $('feeDoubles').value = fees.doubles; $('feeCourt').value = fees.court; }
+  renderPlayers(); renderBoard(); renderStandings(); renderCourts(); renderFees(); renderLeaderboard();
+}
+
+// ---------- courts ----------
+function addCourt(){
+  const name = $('courtName').value.trim();
+  if(!name) return toast('Enter a court name');
+  courts.push({id:'c'+Date.now(), name, status:'available', matchId:null});
+  $('courtName').value=''; renderCourts(); save(); toast(name + ' added');
+}
+function renderCourts(){
+  const el = $('courtList'); if(!el) return;
+  if(!courts.length){ el.innerHTML = '<p class="empty">No courts yet — add one above.</p>'; return; }
+  el.innerHTML = courts.map(c=>{
+    const m = c.matchId!=null ? gameList[c.matchId] : null;
+    const inPlay = m && m.stage === 'play';
+    return `<div class="match">
+      <div class="teams"><span>${c.name}</span><span class="tag ${inPlay?'rr':'done'}">${inPlay ? '● OCCUPIED' : 'AVAILABLE'}</span><button class="tiny" onclick="removeCourt('${c.id}')">✕</button></div>
+      ${inPlay ? `
+        <p class="hint" style="margin:6px 0 0">⏱ <span class="court-elapsed" data-start="${m.startedAt}">0:00</span> · ${m.a.join(' & ')} vs ${m.b.join(' & ')}</p>
+        <div class="match-score">
+          <button class="tiny" onclick="completeCourtMatch('${c.id}')">✓ Complete</button>
+          <button class="tiny" onclick="cancelCourtMatch('${c.id}')">↺ Cancel</button>
+        </div>` : `
+        <p class="hint" style="margin:6px 0 0">Empty. Start a queued match to occupy.</p>`}
+    </div>`;
+  }).join('');
+}
+function removeCourt(id){
+  const c = courts.find(x=>x.id===id); if(!c) return;
+  if(!confirm('Delete ' + c.name + '?')) return;
+  if(c.matchId!=null && gameList[c.matchId]) gameList[c.matchId].stage='queue';
+  courts = courts.filter(x=>x.id!==id); renderCourts(); renderBoard(); save();
+}
+function startOnCourt(matchIdx, courtId){
+  const c = courts.find(x=>x.id===courtId); if(!c || c.status!=='available') return toast('No available court');
+  const m = gameList[matchIdx];
+  m.stage='play'; m.startedAt=Date.now(); m.courtId=courtId;
+  c.status='occupied'; c.matchId=matchIdx;
+  renderBoard(); renderCourts(); save(); toast('Match started on ' + c.name);
+}
+function startMatch(i){
+  const free = courts.find(c=>c.status==='available');
+  if(!free) return toast('Add/free a court first');
+  startOnCourt(i, free.id);
+}
+function completeCourtMatch(courtId){
+  const c = courts.find(x=>x.id===courtId); if(!c) return;
+  const m = gameList[c.matchId];
+  if(m){ m.stage='done'; }
+  c.status='available'; c.matchId=null;
+  renderBoard(); renderCourts(); renderStandings(); renderFees(); renderLeaderboard(); updateStats(); save();
+  toast('Match completed — court freed');
+}
+function cancelCourtMatch(courtId){
+  const c = courts.find(x=>x.id===courtId); if(!c) return;
+  const m = gameList[c.matchId];
+  if(m){ m.stage='queue'; delete m.courtId; }
+  c.status='available'; c.matchId=null;
+  renderBoard(); renderCourts(); save(); toast('Match returned to queue');
+}
+setInterval(()=>{
+  document.querySelectorAll('.court-elapsed').forEach(el=>{
+    const s = Math.floor((Date.now() - (+el.dataset.start||Date.now()))/1000);
+    el.textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+  });
+}, 1000);
+function createSession(name){
+  const db = getDB();
+  const id = 's' + Date.now();
+  db.sessions[id] = {id, name, sport:'Badminton', format:'doubles', players:[], matches:[], courts:[], fees:{singles:60, doubles:30, court:120}, expenses:[], paidMap:{}, created:Date.now(), updated:Date.now()};
+  db.current = id; putDB(db);
+  loadSession(id);
+  $('landing').classList.add('hidden');
+  toast('Session "' + name + '" created');
+}
+function deleteSession(id){
+  const db = getDB(); delete db.sessions[id];
+  if(db.current === id) db.current = null;
+  putDB(db); renderSessions();
+}
+function clearCache(){
+  if(!confirm('Delete ALL saved sessions and scores on this browser? This cannot be undone.')) return;
+  localStorage.removeItem('rallyqueue_db');
+  players=[]; gameList=[]; courts=[]; fees={singles:60,doubles:30,court:120}; expenses=[]; paidMap={}; currentSessionId=null; usedMatchKeys=new Set();
+  renderSessions(); toast('Cache cleared');
+}
+function showLanding(){ renderSessions(); $('landing').classList.remove('hidden'); }
+function renderSessions(){
+  const db = getDB();
+  const list = Object.values(db.sessions).sort((a,b)=>b.updated-a.updated);
+  $('sessionList').innerHTML = list.length ? list.map(s=>`
+    <div class="session-card">
+      <div><b>${s.name}</b><span class="meta">${s.sport} · ${s.format} · ${(s.players||[]).length} players · ${(s.matches||[]).length} matches · ${new Date(s.updated).toLocaleDateString()}</span></div>
+      <div class="actions">
+        <button onclick="openSession('${s.id}')">Open</button>
+        <button class="ghost" onclick="deleteSession('${s.id}')">Delete</button>
+      </div>
+    </div>`).join('')
+    : '<p class="empty" style="text-align:center">No saved sessions yet — add one below to get started.</p>';
+}
+function openSession(id){ loadSession(id); $('landing').classList.add('hidden'); toast('Session loaded'); }
+
+// ---------- ui ----------
+function toast(msg){
+  const t = $('toast'); t.textContent = msg;
+  anime({targets:t, opacity:1, translateY:[10,0], duration:300});
+  setTimeout(()=>anime({targets:t, opacity:0, duration:400}), 2200);
+}
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+function updateStats(){
+  $('statPlayers').textContent = players.length;
+  $('statMatches').textContent = gameList.length;
+  $('statDone').textContent = gameList.filter(m=>m.sa!=null && m.sb!=null).length;
+}
+const SPORT_HINTS = {Badminton:'First to 21 · win by 2', Pickleball:'First to 11 · win by 2', Tennis:'Sets · advantage scoring'};
+$('sport').addEventListener('change', ()=>{ $('sportHint').textContent = SPORT_HINTS[$('sport').value]; save(); });
+$('format').addEventListener('change', ()=>{ renderFees(); save(); });
+
+// ---------- players ----------
+function addPlayers(){
+  const names = $('players').value.split(',').map(s=>s.trim()).filter(Boolean);
+  names.forEach(n=>{ if(!players.includes(n)) players.push(n); });
+  $('players').value='';
+  renderPlayers(); save(); toast(players.length + ' players in queue');
+}
+function removePlayer(i){ if(!confirm(`Remove ${players[i]} from this session?`)) return; players.splice(i,1); renderPlayers(); save(); }
+function renderPlayers(){
+  $('playerList').innerHTML = players.length
+    ? '<ul>' + players.map((p,i)=>`<li draggable="true" data-idx="${i}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropPlayer(event)" ondragend="dragEnd(event)"><span>☰ ${i+1}. ${p}</span><span class="row" style="flex:0 0 auto;gap:6px;align-items:center"><span class="tag">ready</span><button class="tiny" onclick="removePlayer(${i})">✕</button></span></li>`).join('') + '</ul><p class="hint">Drag ☰ rows to reorder queue priority.</p>'
+    : '<p class="empty">Queue is empty.</p>';
+  updateStats(); renderFees(); renderLeaderboard();
+}
+let dragIdx = null;
+function dragStart(e){ dragIdx = +e.currentTarget.dataset.idx; e.currentTarget.classList.add('dragging'); }
+function dragOver(e){ e.preventDefault(); }
+function dragEnd(e){ e.currentTarget.classList.remove('dragging'); }
+function dropPlayer(e){
+  e.preventDefault();
+  const to = +e.currentTarget.dataset.idx;
+  if(dragIdx==null || dragIdx===to) return;
+  const [mv] = players.splice(dragIdx,1);
+  players.splice(to,0,mv);
+  renderPlayers(); save(); toast('Queue reordered');
+}
+function resetAll(){
+  if(!confirm('Reset this session: clear players, matches, roulette and ladder?')) return;
+  players=[]; gameList=[]; courts=[]; expenses=[]; paidMap={}; usedMatchKeys=new Set();
+  $('rouletteResult').innerHTML=''; $('bracket').innerHTML=''; $('standings').innerHTML=''; $('upNext').innerHTML='';
+  renderPlayers(); renderBoard(); renderCourts(); renderFees(); renderLeaderboard(); save(); toast('Session reset');
+}
+
+// ---------- rotation ----------
+function playCounts(){
+  const c = {}; players.forEach(p=>c[p]=0);
+  gameList.forEach(m=>[...m.a,...m.b].forEach(p=>{ if(c[p]!=null) c[p]++; }));
+  return c;
+}
+
+// ---------- roulette ----------
+function spinRoulette(){
+  const doubles = $('format').value==='doubles';
+  if(players.length < (doubles?4:2)) return toast('Need more players');
+  const s = shuffle(players);
+  let html='';
+  for(let i=0;i+1<s.length;i+=2){
+    html += doubles ? `<span class="pill"><b>${s[i]}</b> + ${s[i+1]}</span>` : `<span class="pill"><b>${s[i]}</b> vs <b>${s[i+1]}</b></span>`;
+  }
+  if(s.length % 2 !== 0) html += `<span class="pill bye">⏳ ${s[s.length-1]} — BYE</span>`;
+  $('rouletteResult').innerHTML = html;
+  anime({targets:'#rouletteResult .pill', scale:[0,1], delay:anime.stagger(70), duration:400, easing:'easeOutBack'});
+  toast('Partners shuffled 🎲');
+}
+
+// ---------- match queueing ----------
+function genMatch(){
+  const doubles = $('format').value==='doubles';
+  if(players.length < (doubles?4:2)) return toast('Need more players');
+  const counts = playCounts();
+  const ordered = shuffle(players).sort((a,b)=>counts[a]-counts[b]);
+  const t = shuffle(ordered.slice(0,6));
+  const a = doubles ? t.slice(0,2) : [t[0]];
+  const b = doubles ? t.slice(2,4) : [t[1]];
+  const key = pairKey(a,b);
+  if(usedMatchKeys.has(key)) toast('Fresh pairings exhausted — allowing repeat');
+  usedMatchKeys.add(key);
+  gameList.push({a, b, sa:null, sb:null, stage:'queue'});
+  renderBoard(); save(); toast('Match queued');
+  $('upNext').innerHTML = `<p style="margin-top:10px"><span class="tag">UP NEXT</span> <b>${a.join(' & ')}</b> vs <b>${b.join(' & ')}</b></p>`;
+}
+function removeMatch(i){
+  const m = gameList[i];
+  if(!confirm(`Delete match "${m.a.join(' & ')} vs ${m.b.join(' & ')}" and its score?`)) return;
+  gameList.splice(i,1); renderBoard(); save();
+}
+
+function renderBoard(){
+  const el = $('scoreboard');
+  if(!gameList.length){ el.innerHTML='<p class="empty">No matches yet.</p>'; updateStats(); return; }
+  const order = {queue:0, play:1, done:2, rr:0};
+  const indexed = gameList.map((m,i)=>({m,i})).sort((x,y)=>(order[x.m.stage]||0) - (order[y.m.stage]||0));
+  const grouped = gameList.length > 6;
+  let html = '', shown = {queue:false, play:false, done:false};
+  const label = {queue:'Up next', play:'In play', done:'Finished'};
+  indexed.forEach(({m,i})=>{
+    if(grouped && !shown[m.stage]){ html += `<div class="stage-head">${label[m.stage]||m.stage}</div>`; shown[m.stage]=true; }
+    html += `
+    <div class="match" data-stage="${m.stage}">
+      <div class="teams"><span>${m.a.join(' & ')}</span><span style="color:var(--muted)">vs</span><span>${m.b.join(' & ')}</span><span class="tag ${m.stage==='rr'?'rr':''} ${m.stage==='done'?'done':''}">${m.stage==='done'?'✓ done':m.stage}</span><button class="tiny" onclick="removeMatch(${i})">✕</button></div>
+      <div class="match-score">
+        <button class="tiny pad-btn" ${m.stage==='done'?'disabled':''} onclick="adjScore(${i},'a',-1)">−</button>
+        <input type="number" min="0" placeholder="A" aria-label="Score A" value="${m.sa??''}" ${m.stage==='done'?'readonly':''} oninput="gameList[${i}].sa= this.value===''?null:+this.value;save();updateStats();">
+        <button class="tiny pad-btn" ${m.stage==='done'?'disabled':''} onclick="adjScore(${i},'a',1)">+</button>
+        <span>:</span>
+        <button class="tiny pad-btn" ${m.stage==='done'?'disabled':''} onclick="adjScore(${i},'b',-1)">−</button>
+        <input type="number" min="0" placeholder="B" aria-label="Score B" value="${m.sb??''}" ${m.stage==='done'?'readonly':''} oninput="gameList[${i}].sb= this.value===''?null:+this.value;save();updateStats();">
+        <button class="tiny pad-btn" ${m.stage==='done'?'disabled':''} onclick="adjScore(${i},'b',1)">+</button>
+        <button class="tiny" ${m.stage==='done'?'':'style="display:none"'} onclick="gameList[${i}].stage='queue';renderBoard();save();" title="Reopen">↺ reopen</button>
+        <button class="tiny" ${m.stage==='done'?'style="display:none"':''} onclick="finishMatch(${i})" title="Finish &amp; tally">✓ finish</button>
+        <button class="tiny" ${m.stage==='queue'?'':'style="display:none"'} onclick="startMatch(${i})" title="Start on first free court">▶ start</button>
+      </div>
+      ${m.stage==='play'?'<p class="hint" style="margin:6px 0 0">● Live on '+(m.courtId? (courts.find(c=>c.id===m.courtId)||{}).name||'court' : 'court')+'</p>':''}
+    </div>`;
+  });
+  el.innerHTML = html;
+  updateStats();
+  anime({targets:'#scoreboard .match', translateY:[8,0], opacity:[0,1], delay:anime.stagger(60), duration:350, easing:'easeOutQuad'});
+}
+function adjScore(i, side, delta){
+  const m = gameList[i]; if(!m || m.stage==='done') return;
+  const k = side === 'a' ? 'sa' : 'sb';
+  m[k] = Math.max(0, (m[k] ?? 0) + delta);
+  renderBoard(); save(); updateStats();
+}
+
+// ---------- standings ----------
+function finishMatch(i){
+  const m = gameList[i];
+  if(m.sa == null || m.sb == null) return toast('Enter both scores before finishing');
+  m.stage = 'done';
+  renderBoard(); renderStandings(); renderLeaderboard(); updateStats(); save();
+  anime({targets:'#standings tr td', backgroundColor:['rgba(124,240,200,.18)','rgba(0,0,0,0)'], duration:700, easing:'easeOutQuad'});
+  toast('Match finished — tally updated');
+}
+function computeTable(){
+  const t = {}; players.forEach(p=>t[p]={w:0,d:0,l:0,pf:0,pa:0});
+  gameList.forEach(m=>{
+    if(m.stage !== 'done') return;
+    if(m.sa==null||m.sb==null||isNaN(m.sa)||isNaN(m.sb)) return;
+    m.a.forEach(p=>{ if(!t[p]) return; t[p].pf+=m.sa; t[p].pa+=m.sb; });
+    m.b.forEach(p=>{ if(!t[p]) return; t[p].pf+=m.sb; t[p].pa+=m.sa; });
+    const winA = m.sa>m.sb, draw = m.sa===m.sb;
+    m.a.forEach(p=>{ if(!t[p]) return; if(draw) t[p].d++; else winA ? t[p].w++ : t[p].l++; });
+    m.b.forEach(p=>{ if(!t[p]) return; if(draw) t[p].d++; else !winA ? t[p].w++ : t[p].l++; });
+  });
+  return Object.entries(t).sort((a,b)=> (b[1].w-a[1].w) || ((b[1].pf-b[1].pa)-(a[1].pf-a[1].pa)) || (b[1].pf-a[1].pf));
+}
+function renderStandings(){
+  const rows = computeTable();
+  $('standings').innerHTML = `<table><tr><th>#</th><th>Player</th><th>W</th><th>D</th><th>L</th><th>+/-</th></tr>` +
+    rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r[0]}</td><td><b>${r[1].w}</b></td><td>${r[1].d}</td><td>${r[1].l}</td><td>${r[1].pf-r[1].pa}</td></tr>`).join('') + `</table>`;
+}
+
+// ---------- elimination -> playable RR ----------
+function eliminate(){
+  renderStandings();
+  const n = Math.min(+$('advanceN').value, players.length);
+  const top = computeTable().slice(0,n).map(r=>r[0]);
+  let added=0;
+  for(let i=0;i<top.length;i++) for(let j=i+1;j<top.length;j++){
+    gameList.push({a:[top[i]], b:[top[j]], sa:null, sb:null, stage:'rr'}); added++;
+  }
+  $('bracket').innerHTML = `<p style="margin:12px 0">Top ${n} advance → <b>${added}</b> round-robin matches added to the scoreboard (RR). Score them to crown the champion.</p><ul>` +
+    top.map((p,i)=>`<li><span>${i+1}. ${p}</span><span class="tag rr">RR</span></li>`).join('') + '</ul>';
+  renderBoard(); save();
+  anime({targets:'#bracket li', translateX:[-15,0], opacity:[0,1], delay:anime.stagger(50), duration:300});
+  toast('Championship ladder ready');
+}
+
+// ---------- fees ----------
+function perPlayerFee(){
+  return ($('format').value === 'singles' ? (+fees.singles||0) : (+fees.doubles||0)) + (+fees.court||0);
+}
+function updateFees(){
+  fees.singles = +($('feeSingles').value||0);
+  fees.doubles = +($('feeDoubles').value||0);
+  fees.court = +($('feeCourt').value||0);
+  renderFees(); save();
+}
+function togglePaid(name){ paidMap[name] = !paidMap[name]; renderFees(); save(); }
+function addExpense(){
+  const n = $('expenseName').value.trim(), a = +($('expenseAmt').value||0);
+  if(!n || !a) return toast('Enter expense name + amount');
+  expenses.push({name:n, amt:a});
+  $('expenseName').value=''; $('expenseAmt').value='';
+  renderFees(); save(); toast('Expense added');
+}
+function removeExpense(i){ expenses.splice(i,1); renderFees(); save(); }
+function renderFees(){
+  if(!$('feeCollected')) return;
+  const rate = perPlayerFee();
+  let collected = 0, outstanding = 0;
+  players.forEach(p=>{ if(paidMap[p]) collected += rate; else outstanding += rate; });
+  const expTotal = expenses.reduce((s,e)=>s+(+e.amt||0),0);
+  $('feeCollected').textContent = '₱' + collected;
+  $('feeOutstanding').textContent = '₱' + outstanding;
+  $('feeExpensesTotal').textContent = '₱' + expTotal;
+  $('feeNet').textContent = '₱' + (collected - expTotal);
+  $('expenseList').innerHTML = expenses.length
+    ? '<ul>' + expenses.map((e,i)=>`<li><span>${e.name}</span><span>₱${e.amt} <button class="tiny" onclick="removeExpense(${i})">✕</button></span></li>`).join('') + '</ul>'
+    : '<p class="empty">No expenses yet.</p>';
+  $('feeRoster').innerHTML = players.length
+    ? '<ul>' + players.map(p=>`<li><span>${p} — ₱${rate}</span><button class="tiny" onclick="togglePaid('${p.replace(/'/g,"\\'")}')">${paidMap[p]?'✓ paid':'mark paid'}</button></li>`).join('') + '</ul>'
+    : '<p class="empty">Once the fee is configured, the players you add to the game will have their fees displayed here.</p>';
+}
+function exportFeesCsv(){
+  const rate = perPlayerFee();
+  let csv = 'player,fee,paid\n' + players.map(p=>[p, rate, paidMap[p]?'yes':'no'].join(',')).join('\n');
+  csv += '\nexpense,amount\n' + expenses.map(e=>[e.name, e.amt].join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'fees.csv'; a.click();
+  URL.revokeObjectURL(a.href); toast('Fees exported');
+}
+
+// ---------- leaderboard ----------
+function showRankTab(t){ rankTab = t; renderLeaderboard(); }
+function renderLeaderboard(){
+  const el = $('leaderboard'); if(!el) return;
+  if(rankTab === 'global'){
+    const db = getDB();
+    const agg = {};
+    Object.values(db.sessions).forEach(s=>{
+      (s.players||[]).forEach(p=>{ agg[p] = agg[p]||{w:0,d:0,l:0,pf:0,pa:0,sessions:0}; });
+      (s.matches||[]).forEach(m=>{
+        if(m.sa==null||m.sb==null) return;
+        const winA = m.sa>m.sb, draw = m.sa===m.sb;
+        [...(m.a||[]),...(m.b||[])].forEach(p=>{ if(!agg[p]) agg[p]={w:0,d:0,l:0,pf:0,pa:0,sessions:0}; });
+        (m.a||[]).forEach(p=>{ agg[p].pf+=m.sa; agg[p].pa+=m.sb; if(draw) agg[p].d++; else winA?agg[p].w++:agg[p].l++; });
+        (m.b||[]).forEach(p=>{ agg[p].pf+=m.sb; agg[p].pa+=m.sa; if(draw) agg[p].d++; else !winA?agg[p].w++:agg[p].l++; });
+      });
+    });
+    const rows = Object.entries(agg).sort((a,b)=>b[1].w-a[1].w || ((b[1].pf-b[1].pa)-(a[1].pf-a[1].pa))).slice(0,20);
+    el.innerHTML = rows.length
+      ? `<table><tr><th>#</th><th>Player</th><th>W</th><th>D</th><th>L</th><th>+/-</th></tr>` + rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r[0]}</td><td><b>${r[1].w}</b></td><td>${r[1].d}</td><td>${r[1].l}</td><td>${r[1].pf-r[1].pa}</td></tr>`).join('') + '</table>'
+      : '<p class="empty" style="text-align:center">No rankings yet — complete some matches to see the leaderboard.</p>';
+    return;
+  }
+  const rows = computeTable().filter(r=>(r[1].w+r[1].d+r[1].l)>0);
+  el.innerHTML = rows.length
+    ? `<table><tr><th>#</th><th>Player</th><th>W</th><th>D</th><th>L</th><th>+/-</th></tr>` + rows.map((r,i)=>`<tr><td>${i+1}</td><td>${['🥇','🥈','🥉'][i]||''} ${r[0]}</td><td><b>${r[1].w}</b></td><td>${r[1].d}</td><td>${r[1].l}</td><td>${r[1].pf-r[1].pa}</td></tr>`).join('') + '</table>'
+    : '<p class="empty" style="text-align:center">🏆 No rankings yet<br>Complete some matches to see the leaderboard</p>';
+}
+
+// ---------- speech to text ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function initMic(){
+  const btn = $('micBtn');
+  if(!SR){ btn.disabled = true; btn.textContent = '🎤 N/A'; $('micHint').textContent = 'Speech input not supported in this browser (try Chrome/Edge).'; return; }
+  const rec = new SR();
+  rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
+  let listening = false;
+  btn.addEventListener('click', ()=>{
+    if(listening){ rec.stop(); return; }
+    try{ rec.start(); }catch(e){}
+  });
+  rec.onstart = ()=>{ listening = true; btn.textContent = '⏹ Listening…'; $('micHint').textContent = 'Listening — say the names now.'; };
+  rec.onend = ()=>{ listening = false; btn.textContent = '🎤 Speak'; };
+  rec.onerror = e=>{
+    listening = false; btn.textContent = '🎤 Speak';
+    if(e.error === 'not-allowed'){
+      $('micHint').textContent = 'Microphone blocked — click the lock/mic icon in the address bar, allow microphone, then reload the page.';
+      toast('Allow microphone access in the browser address bar');
+    } else if(e.error === 'no-speech'){ $('micHint').textContent = 'No speech detected — try again, closer to the mic.'; }
+    else if(e.error === 'network'){ $('micHint').textContent = 'Speech needs an internet connection (Chrome uses online recognition).'; }
+    else { $('micHint').textContent = 'Speech error: ' + e.error; }
+  };
+  rec.onresult = e=>{
+    let text = e.results[0][0].transcript;
+    // split on commas, "and", "then", "&"
+    const names = text.split(/\s*(?:,| and | then | & )\s*/i).map(s=>s.trim()).filter(Boolean);
+    if(!names.length) return toast('Heard nothing usable');
+    names.forEach(n=>{ const cap = n.charAt(0).toUpperCase() + n.slice(1); if(!players.includes(cap)) players.push(cap); });
+    renderPlayers(); save();
+    $('micHint').textContent = 'Added: ' + names.join(', ');
+    toast(names.length + ' player(s) added via speech');
+  };
+}
+initMic();
+
+// ---------- boot ----------
+$('newSessionForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  const name = $('sessionName').value.trim() || 'Untitled Session';
+  $('sessionName').value='';
+  createSession(name);
+});
+$('clearCache').addEventListener('click', clearCache);
+$('exportJson').addEventListener('click', ()=>{
+  const blob = new Blob([localStorage.getItem('rallyqueue_db') || JSON.stringify(getDB())], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rallyqueue_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Sessions exported');
+});
+$('importJson').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const db = JSON.parse(r.result);
+      if(!db.sessions) return toast('Invalid backup file');
+      localStorage.setItem('rallyqueue_db', JSON.stringify(db));
+      renderSessions(); toast('Sessions imported');
+      if(db.current && db.sessions[db.current]){ loadSession(db.current); $('landing').classList.add('hidden'); }
+    }catch(err){ toast('Could not import: ' + err.message); }
+  };
+  r.readAsText(f);
+});
+renderSessions();
+const db = getDB();
+if(db.current && db.sessions[db.current]){ loadSession(db.current); $('landing').classList.add('hidden'); }
+else { renderFees(); renderLeaderboard(); }
+// scroll-spy for sidenav
+const spy = new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      document.querySelectorAll('.sidenav a').forEach(a=>a.classList.toggle('active', a.getAttribute('href') === '#'+e.target.id));
+    }
+  });
+},{rootMargin:'-40% 0px -50% 0px'});
+['s-court','s-setup','s-queue','s-board','s-bracket','s-fees','s-ranks'].forEach(id=>{ const s=document.getElementById(id); if(s) spy.observe(s); });
+</script>
+</body>
+</html>
